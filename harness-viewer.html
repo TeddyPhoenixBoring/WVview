@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WireViz Harness Viewer</title>
+  <style>
+    :root {
+      --bg: #1a1d23;
+      --panel: #252830;
+      --border: #3a3f4b;
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --accent: #6ba3ff;
+      --accent-dim: #3d5a80;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    .app { display: grid; grid-template-columns: 300px 1fr; height: 100%; }
+    aside {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    header h1 { margin: 0 0 4px; font-size: 1rem; font-weight: 600; }
+    header p { margin: 0; font-size: 0.78rem; color: var(--muted); line-height: 1.35; }
+    .controls { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+    label.file-btn {
+      display: block;
+      text-align: center;
+      padding: 8px 12px;
+      background: var(--accent-dim);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    label.file-btn:hover { background: #4a6fa0; }
+    input[type="file"] { display: none; }
+    button {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #2d3340;
+      color: var(--text);
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    button:hover { background: #383f4f; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .spacing-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+    }
+    .spacing-controls[hidden] { display: none; }
+    #exportControls[hidden] { display: none; }
+    .slider-row { display: flex; flex-direction: column; gap: 4px; }
+    .slider-row label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+    .slider-row .slider-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .slider-row output {
+      font-size: 0.75rem;
+      color: var(--text);
+      min-width: 2.5rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .sidebar-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      cursor: pointer;
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+    }
+    .sidebar-option[hidden] { display: none; }
+    .sidebar-option input { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .node-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .group-title {
+      padding: 8px 16px 4px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .node-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .node-item:hover { background: rgba(255,255,255,0.04); }
+    .node-item.hover-origin { background: rgba(107, 163, 255, 0.14); }
+    .node-item input { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .node-item .label { flex: 1; min-width: 0; }
+    .node-item .sub { display: block; font-size: 0.72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+    .node-item .tag {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    main { display: flex; flex-direction: column; overflow: hidden; }
+    .toolbar {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .toolbar .hint { flex: 1; }
+    #viewport {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      background: #fff;
+      cursor: grab;
+    }
+    #viewport.dragging { cursor: grabbing; }
+    #viewport.dragover { outline: 2px dashed var(--accent); outline-offset: -4px; }
+    #canvas {
+      transform-origin: 0 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    #canvas svg { display: block; max-width: none; }
+    #canvas svg.is-highlighting g.node:not(.highlight),
+    #canvas svg.is-highlighting g.edge:not(.highlight) {
+      opacity: 0.52;
+    }
+    #canvas svg g.node.highlight polygon,
+    #canvas svg g.node.highlight path,
+    #canvas svg g.node.highlight ellipse {
+      stroke: #2563eb !important;
+      stroke-width: 2.5px !important;
+    }
+    #canvas svg g.node.highlight {
+      filter: drop-shadow(0 0 5px rgba(37, 99, 235, 0.55));
+    }
+    #canvas svg g.edge.highlight path,
+    #canvas svg g.edge.highlight polygon {
+      stroke: #2563eb !important;
+      stroke-width: 2.5px !important;
+      opacity: 1 !important;
+    }
+    #canvas svg g.edge.highlight polygon[fill="#000000"],
+    #canvas svg g.edge.highlight polygon[fill="black"] {
+      fill: #2563eb !important;
+    }
+    #placeholder {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 24px;
+      text-align: center;
+      pointer-events: none;
+    }
+    #viewport.show-placeholder #placeholder { display: flex; }
+    .empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 24px;
+      text-align: center;
+    }
+    .status { color: var(--accent); }
+    .error { color: #ff8a80; }
+    .image-folder-hint {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .image-folder-hint.ok { color: #8bc98b; }
+    .image-folder-hint.warn { color: #e8b86d; }
+    #imageFolderBtn { background: var(--accent-dim); border-color: var(--accent-dim); }
+    #imageFolderBtn:hover { background: #4a6fa0; }
+    #imageFolderBtn.needs-attention {
+      background: #3d5a80;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(107, 163, 255, 0.35);
+      animation: pulse-folder 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse-folder {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(107, 163, 255, 0.35); }
+      50% { box-shadow: 0 0 0 4px rgba(107, 163, 255, 0.55); }
+    }
+    .image-prompt {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(10, 12, 16, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .image-prompt[hidden] { display: none; }
+    .image-prompt-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 24px;
+      max-width: 420px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+    .image-prompt-card h2 { margin: 0 0 8px; font-size: 1.05rem; }
+    .image-prompt-card p { margin: 0 0 16px; font-size: 0.85rem; color: var(--muted); line-height: 1.45; }
+    .image-prompt-card ul {
+      margin: 0 0 16px;
+      padding-left: 1.2rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .image-prompt-actions { display: flex; flex-direction: column; gap: 8px; }
+    .image-prompt-actions button.primary {
+      background: var(--accent-dim);
+      border-color: var(--accent-dim);
+    }
+    .image-prompt-actions button.primary:hover { background: #4a6fa0; }
+    .image-prompt-actions button.ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+    }
+    .image-prompt-actions button.ghost:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <header>
+        <h1>WireViz Harness Viewer</h1>
+        <p>Works with any <code>.gv</code> from WireViz (<code>wireviz -fghpst …</code>). If the diagram includes photos, a dialog asks you to choose the image folder (browser security prevents auto-opening it). Uncheck a connector to hide its branch.</p>
+      </header>
+      <div class="controls">
+        <label class="file-btn">
+          Open .gv file…
+          <input type="file" id="fileInput" accept=".gv,.dot,.txt,*/*" />
+        </label>
+        <button type="button" id="imageFolderBtn" hidden>Choose image folder…</button>
+        <input type="file" id="imageFolderInput" webkitdirectory directory multiple tabindex="-1" aria-hidden="true" />
+        <p class="image-folder-hint" id="imageFolderHint" hidden></p>
+        <div class="btn-row">
+          <button type="button" id="showAll">Show all</button>
+          <button type="button" id="hideLeaves">Hide leaf devices</button>
+        </div>
+        <button type="button" id="fitView">Fit to view</button>
+        <label class="sidebar-option" id="accessoriesToggleWrap" hidden>
+          <input type="checkbox" id="showAccessoriesSidebar" />
+          Show accessories in sidebar
+        </label>
+        <div class="btn-row" id="exportControls" hidden>
+          <button type="button" id="exportSvg">Export SVG</button>
+          <button type="button" id="exportPng">Export PNG</button>
+        </div>
+        <div class="spacing-controls" id="spacingControls" hidden>
+          <div class="slider-row">
+            <label for="ranksepSlider" id="ranksepLabel">Horizontal spacing (ranksep)</label>
+            <div class="slider-meta">
+              <input type="range" id="ranksepSlider" min="0.5" max="12" step="0.1" value="3" />
+              <output id="ranksepVal" for="ranksepSlider">3.0</output>
+            </div>
+          </div>
+          <div class="slider-row">
+            <label for="nodesepSlider" id="nodesepLabel">Vertical spacing (nodesep)</label>
+            <div class="slider-meta">
+              <input type="range" id="nodesepSlider" min="0.1" max="3" step="0.05" value="0.8" />
+              <output id="nodesepVal" for="nodesepSlider">0.8</output>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="node-list" id="nodeList">
+        <div class="empty" style="height:auto;padding:24px 16px;">No diagram loaded</div>
+      </div>
+    </aside>
+    <main>
+      <div class="toolbar">
+        <span class="hint" id="status">Open or drop a WireViz .gv file.</span>
+        <span id="counts"></span>
+      </div>
+      <div id="viewport" class="show-placeholder">
+        <div id="placeholder">Open or drop a Graphviz .gv file</div>
+        <div id="canvas" hidden></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="imagePrompt" class="image-prompt" hidden>
+    <div class="image-prompt-card" role="dialog" aria-labelledby="imagePromptTitle">
+      <h2 id="imagePromptTitle">Choose image folder</h2>
+      <p id="imagePromptText">This diagram references photos that WireViz embeds in the harness drawing.</p>
+      <ul id="imagePromptList"></ul>
+      <div class="image-prompt-actions">
+        <button type="button" class="primary" id="imagePromptChoose">Choose folder…</button>
+        <button type="button" class="ghost" id="imagePromptSkip">Skip for now</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { instance } from "https://cdn.jsdelivr.net/npm/@viz-js/viz@3.20.0/+esm";
+
+    let viz = null;
+    let rawDot = "";
+    let parsed = null;
+    let analysis = null;
+    /** @type {Map<string, boolean>} */
+    let visible = new Map();
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let ranksep = 3;
+    let nodesep = 0.8;
+    let rankdir = "LR";
+    let spacingTimer = null;
+    let loadedName = "diagram";
+    let showAccessoriesInSidebar = false;
+    /** @type {Map<string, SVGGElement>} */
+    let svgNodeById = new Map();
+    let activeHighlightId = null;
+    /** @type {string[]} unique src= paths from embedded <img> tags */
+    let embeddedImageSrcs = [];
+    /** @type {Map<string, string>} node id → original node block text (before image path rewrite) */
+    let originalNodeText = new Map();
+    /** @type {Map<string, { mountPath: string, bytes: ArrayBuffer, blobUrl: string, originalSrc: string, fileName: string }>} */
+    let imageAssets = new Map();
+    /** @type {Map<string, string>} original img src → mountPath */
+    let srcToMountPath = new Map();
+    let imageFolderLabel = "";
+
+    const fileInput = document.getElementById("fileInput");
+    const imageFolderBtn = document.getElementById("imageFolderBtn");
+    const imageFolderInput = document.getElementById("imageFolderInput");
+    const imageFolderHint = document.getElementById("imageFolderHint");
+    const imagePrompt = document.getElementById("imagePrompt");
+    const imagePromptText = document.getElementById("imagePromptText");
+    const imagePromptList = document.getElementById("imagePromptList");
+    const imagePromptChoose = document.getElementById("imagePromptChoose");
+    const imagePromptSkip = document.getElementById("imagePromptSkip");
+    let imageFolderPickPending = null;
+    const nodeList = document.getElementById("nodeList");
+    const statusEl = document.getElementById("status");
+    const countsEl = document.getElementById("counts");
+    const viewport = document.getElementById("viewport");
+    const canvas = document.getElementById("canvas");
+    const placeholder = document.getElementById("placeholder");
+    const spacingControls = document.getElementById("spacingControls");
+    const ranksepSlider = document.getElementById("ranksepSlider");
+    const nodesepSlider = document.getElementById("nodesepSlider");
+    const ranksepVal = document.getElementById("ranksepVal");
+    const nodesepVal = document.getElementById("nodesepVal");
+    const ranksepLabel = document.getElementById("ranksepLabel");
+    const nodesepLabel = document.getElementById("nodesepLabel");
+    const exportControls = document.getElementById("exportControls");
+    const exportSvgBtn = document.getElementById("exportSvg");
+    const exportPngBtn = document.getElementById("exportPng");
+    const accessoriesToggleWrap = document.getElementById("accessoriesToggleWrap");
+    const showAccessoriesSidebar = document.getElementById("showAccessoriesSidebar");
+
+    async function getViz() {
+      if (!viz) viz = await instance();
+      return viz;
+    }
+
+    function normalizePathSlashes(p) {
+      return p.replace(/\\/g, "/");
+    }
+
+    function basenameFromPath(p) {
+      const norm = normalizePathSlashes(p);
+      return norm.slice(norm.lastIndexOf("/") + 1);
+    }
+
+    function collectEmbeddedImageSrcs(text) {
+      const srcs = new Set();
+      const re = /<img\b[^>]*\bsrc="([^"]+)"/gi;
+      let match;
+      while ((match = re.exec(text)) !== null) srcs.add(match[1]);
+      return [...srcs];
+    }
+
+    function clearImageAssets() {
+      for (const asset of imageAssets.values()) URL.revokeObjectURL(asset.blobUrl);
+      imageAssets.clear();
+      srcToMountPath.clear();
+      imageFolderLabel = "";
+    }
+
+    function syncImageFolderUi() {
+      const needsFolder = embeddedImageSrcs.length > 0;
+      const unresolved = needsFolder && srcToMountPath.size < embeddedImageSrcs.length;
+      imageFolderBtn.hidden = !needsFolder;
+      imageFolderHint.hidden = !needsFolder;
+      imageFolderBtn.classList.toggle("needs-attention", unresolved);
+      if (!needsFolder) {
+        imageFolderHint.textContent = "";
+        imageFolderHint.className = "image-folder-hint";
+        hideImagePrompt();
+        return;
+      }
+      const resolved = srcToMountPath.size;
+      const total = embeddedImageSrcs.length;
+      if (resolved === total) {
+        imageFolderHint.textContent = `${resolved}/${total} images from ${imageFolderLabel || "folder"}`;
+        imageFolderHint.className = "image-folder-hint ok";
+        hideImagePrompt();
+      } else if (resolved > 0) {
+        imageFolderHint.textContent = `${resolved}/${total} images found — check folder or filenames`;
+        imageFolderHint.className = "image-folder-hint warn";
+      } else {
+        imageFolderHint.textContent = `${total} embedded image(s) — click “Choose image folder…” above`;
+        imageFolderHint.className = "image-folder-hint warn";
+      }
+    }
+
+    function showImagePrompt() {
+      if (!embeddedImageSrcs.length || srcToMountPath.size === embeddedImageSrcs.length) {
+        hideImagePrompt();
+        return;
+      }
+      const insecure =
+        location.protocol === "file:" ||
+        (!window.isSecureContext && typeof window.showDirectoryPicker !== "function");
+      imagePromptText.textContent =
+        `This diagram references ${embeddedImageSrcs.length} photo(s). ` +
+        "Pick the folder that contains them (often a resources/ folder next to your YAML)." +
+        (insecure
+          ? " Open this page via http://localhost (not file://) if the folder picker does not appear."
+          : "");
+      imagePromptList.innerHTML = embeddedImageSrcs
+        .slice(0, 6)
+        .map((src) => `<li>${escapeHtml(basenameFromPath(src))}</li>`)
+        .join("");
+      if (embeddedImageSrcs.length > 6) {
+        imagePromptList.innerHTML += `<li>…and ${embeddedImageSrcs.length - 6} more</li>`;
+      }
+      imagePrompt.hidden = false;
+    }
+
+    function hideImagePrompt() {
+      imagePrompt.hidden = true;
+    }
+
+    async function filesFromDirectoryHandle(dirHandle, pathPrefix = "") {
+      const files = [];
+      for await (const entry of dirHandle.values()) {
+        const rel = pathPrefix ? `${pathPrefix}/${entry.name}` : entry.name;
+        if (entry.kind === "file") {
+          const file = await entry.getFile();
+          Object.defineProperty(file, "webkitRelativePath", { value: rel, configurable: true });
+          files.push(file);
+        } else if (entry.kind === "directory") {
+          files.push(...(await filesFromDirectoryHandle(entry, rel)));
+        }
+      }
+      return files;
+    }
+
+    async function pickImageFolderViaDirectoryPicker() {
+      const dir = await window.showDirectoryPicker({ mode: "read" });
+      imageFolderLabel = dir.name;
+      return filesFromDirectoryHandle(dir);
+    }
+
+    function pickImageFolderViaInput() {
+      return new Promise((resolve) => {
+        if (imageFolderPickPending) {
+          imageFolderPickPending(null);
+        }
+        imageFolderPickPending = resolve;
+
+        const onChange = async () => {
+          imageFolderInput.removeEventListener("change", onChange);
+          imageFolderInput.removeEventListener("cancel", onCancel);
+          const pending = imageFolderPickPending;
+          imageFolderPickPending = null;
+          const files = imageFolderInput.files;
+          imageFolderInput.value = "";
+          if (!files?.length) {
+            pending?.(null);
+            return;
+          }
+          pending?.(await resolveImagesFromFolder(files));
+        };
+
+        const onCancel = () => {
+          imageFolderInput.removeEventListener("change", onChange);
+          imageFolderInput.removeEventListener("cancel", onCancel);
+          const pending = imageFolderPickPending;
+          imageFolderPickPending = null;
+          imageFolderInput.value = "";
+          pending?.(null);
+        };
+
+        imageFolderInput.addEventListener("change", onChange);
+        imageFolderInput.addEventListener("cancel", onCancel);
+        imageFolderInput.click();
+      });
+    }
+
+    /** Must be called directly from a user click — browsers block async auto-prompts. */
+    async function pickImageFolder() {
+      try {
+        let fileList = null;
+        if (typeof window.showDirectoryPicker === "function") {
+          try {
+            fileList = await pickImageFolderViaDirectoryPicker();
+          } catch (err) {
+            if (err?.name === "AbortError") return null;
+            console.warn("showDirectoryPicker failed, falling back to file input:", err);
+          }
+        }
+        if (!fileList?.length) {
+          const viaInput = await pickImageFolderViaInput();
+          return viaInput;
+        }
+        return await resolveImagesFromFolder(fileList);
+      } catch (err) {
+        statusEl.innerHTML = `<span class="error">Image folder error: ${escapeHtml(err.message)}</span>`;
+        return null;
+      }
+    }
+
+    async function onImageFolderChosen() {
+      hideImagePrompt();
+      const result = await pickImageFolder();
+      if (result) {
+        statusEl.textContent = `Images: ${result.resolved}/${result.total} loaded`;
+        syncImageFolderUi();
+        await rerender({ preserveView: true });
+      } else {
+        syncImageFolderUi();
+        if (embeddedImageSrcs.length && srcToMountPath.size < embeddedImageSrcs.length) {
+          showImagePrompt();
+        }
+      }
+      return result;
+    }
+
+    function matchFileForSrc(src, files) {
+      const norm = normalizePathSlashes(src).replace(/^\/+[A-Za-z]:/, "/");
+      const base = basenameFromPath(norm);
+      const candidates = files.filter((f) => {
+        const name = f.name;
+        const rel = normalizePathSlashes(f.webkitRelativePath || f.name);
+        return name === base || basenameFromPath(rel) === base;
+      });
+      if (!candidates.length) return null;
+      if (candidates.length === 1) return candidates[0];
+
+      const tail = norm.replace(/^\/+/, "");
+      const tailBase = basenameFromPath(tail);
+      const bySuffix = candidates.filter((f) => {
+        const rel = normalizePathSlashes(f.webkitRelativePath || f.name);
+        return rel === tail || rel.endsWith("/" + tail) || rel.endsWith("/" + tailBase);
+      });
+      if (bySuffix.length === 1) return bySuffix[0];
+      return candidates[0];
+    }
+
+    function loadImageMeta(file) {
+      return new Promise((resolve, reject) => {
+        const blobUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => resolve({ blobUrl, width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => {
+          URL.revokeObjectURL(blobUrl);
+          reject(new Error(`Could not decode ${file.name}`));
+        };
+        img.src = blobUrl;
+      });
+    }
+
+    function rewriteNodeImages(text) {
+      return text.replace(
+        /(<img\b[^>]*\bsrc=")([^"]+)("[^>]*\/?>)/gi,
+        (_full, pre, src, post) => {
+          const mountPath = srcToMountPath.get(src);
+          return mountPath ? `${pre}${mountPath}${post}` : `${pre}${src}${post}`;
+        }
+      );
+    }
+
+    function applyImageRewritesToNodes() {
+      for (const node of parsed.nodes) {
+        const original = originalNodeText.get(node.id);
+        if (original) node.text = rewriteNodeImages(original);
+      }
+    }
+
+    async function resolveImagesFromFolder(fileList) {
+      clearImageAssets();
+      if (!embeddedImageSrcs.length || !fileList?.length) {
+        applyImageRewritesToNodes();
+        syncImageFolderUi();
+        return { resolved: 0, total: embeddedImageSrcs.length };
+      }
+
+      const files = [...fileList];
+      const first = files[0];
+      const rel = first.webkitRelativePath || first.name;
+      imageFolderLabel = rel.includes("/") ? rel.split("/")[0] : "selected folder";
+
+      const usedNames = new Set();
+      for (const src of embeddedImageSrcs) {
+        const file = matchFileForSrc(src, files);
+        if (!file) continue;
+
+        let mountName = basenameFromPath(file.name);
+        if (usedNames.has(mountName)) mountName = `${usedNames.size}_${mountName}`;
+        usedNames.add(mountName);
+
+        const mountPath = `/wv/${mountName}`;
+        const bytes = await file.arrayBuffer();
+        const { blobUrl } = await loadImageMeta(file);
+        srcToMountPath.set(src, mountPath);
+        imageAssets.set(mountPath, {
+          mountPath,
+          bytes,
+          blobUrl,
+          originalSrc: src,
+          fileName: file.name,
+        });
+      }
+
+      applyImageRewritesToNodes();
+      syncImageFolderUi();
+      return { resolved: srcToMountPath.size, total: embeddedImageSrcs.length };
+    }
+
+    function mountImageFiles(v, pathsOut) {
+      const mod = v.module;
+      for (const asset of imageAssets.values()) {
+        const fsPath = asset.mountPath;
+        mod.FS.createPath("/", mod.PATH.dirname(fsPath), true, true);
+        mod.FS.writeFile(fsPath, new Uint8Array(asset.bytes));
+        pathsOut.push(fsPath);
+      }
+    }
+
+    function unmountImageFiles(v, paths) {
+      const mod = v.module;
+      for (const fsPath of paths) {
+        if (mod.FS.analyzePath(fsPath).exists) mod.FS.unlink(fsPath);
+      }
+    }
+
+    function injectImageUrls(svg) {
+      if (!imageAssets.size) return svg;
+      let out = svg;
+      for (const asset of imageAssets.values()) {
+        const replacements = new Set([
+          asset.mountPath,
+          asset.mountPath.slice(1),
+          asset.originalSrc,
+          normalizePathSlashes(asset.originalSrc),
+          basenameFromPath(asset.originalSrc),
+        ]);
+        for (const href of replacements) {
+          if (!href) continue;
+          out = out.replaceAll(`xlink:href="${href}"`, `xlink:href="${asset.blobUrl}"`);
+          out = out.replaceAll(`href="${href}"`, `href="${asset.blobUrl}"`);
+        }
+      }
+      return out;
+    }
+
+    function mimeForImage(fileName) {
+      if (/\.jpe?g$/i.test(fileName)) return "image/jpeg";
+      if (/\.gif$/i.test(fileName)) return "image/gif";
+      if (/\.svg$/i.test(fileName)) return "image/svg+xml";
+      return "image/png";
+    }
+
+    function bytesToDataUrl(bytes, mime) {
+      let binary = "";
+      const arr = new Uint8Array(bytes);
+      for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
+      return `data:${mime};base64,${btoa(binary)}`;
+    }
+
+    function embedImagesForExport(svg) {
+      if (!imageAssets.size) return svg;
+      let out = svg;
+      for (const asset of imageAssets.values()) {
+        const dataUrl = bytesToDataUrl(asset.bytes, mimeForImage(asset.fileName));
+        out = out.replaceAll(asset.blobUrl, dataUrl);
+      }
+      return out;
+    }
+
+    async function renderDotString(dot, format) {
+      const v = await getViz();
+      const mounted = [];
+      try {
+        mountImageFiles(v, mounted);
+        if (format === "svg") {
+          return injectImageUrls(v.renderString(dot, { format: "svg", engine: "dot" }));
+        }
+        return v.render(dot, { format: "png", engine: "dot" });
+      } finally {
+        unmountImageFiles(v, mounted);
+      }
+    }
+
+    function normalizeId(token) {
+      const t = token.trim();
+      const quoted = t.match(/^"((?:[^"\\]|\\.)*)"(?::|$)/);
+      if (quoted) return quoted[1];
+      return t.split(":")[0];
+    }
+
+    /** WireViz autogenerated instances: __F_1, __R_2, etc. */
+    function isAutogenerated(id) {
+      return /^_{1,2}[A-Za-z][\w-]*_\d+$/.test(id);
+    }
+
+    function extractDisplayName(nodeText) {
+      const cells = [...nodeText.matchAll(/<td balign="left">([^<]*)<\/td>/gi)];
+      if (!cells.length) return null;
+      return cells[0][1].trim() || null;
+    }
+
+    function getHeader(src) {
+      const m = src.match(
+        /^[\s\S]*?(?=^\t(?:"(?:[^"\\]|\\.)*"|[A-Za-z_][\w-]*)\s+\[label=)/m
+      );
+      return m ? m[0].trimEnd() : "graph {";
+    }
+
+    function parseGraphSpacing(header) {
+      const m = header.match(/^\tgraph \[([^\]]*)\]/m);
+      if (!m) return { ranksep: 2, nodesep: 0.33, rankdir: "LR" };
+      const attrs = m[1];
+      return {
+        ranksep: parseFloat(attrs.match(/\branksep=([^\s\]]+)/)?.[1] ?? "2"),
+        nodesep: parseFloat(attrs.match(/\bnodesep=([^\s\]]+)/)?.[1] ?? "0.33"),
+        rankdir: attrs.match(/\brankdir=(\w+)/)?.[1] ?? "LR",
+      };
+    }
+
+    function applyGraphSpacing(header, nextRanksep, nextNodesep) {
+      return header.replace(/^\tgraph \[([^\]]*)\]/m, (_full, attrs) => {
+        let next = attrs;
+        if (/\branksep=/.test(next)) {
+          next = next.replace(/\branksep=[^\s\]]+/, `ranksep=${nextRanksep}`);
+        } else {
+          next = `${next.trimEnd()} ranksep=${nextRanksep}`;
+        }
+        if (/\bnodesep=/.test(next)) {
+          next = next.replace(/\bnodesep=[^\s\]]+/, `nodesep=${nextNodesep}`);
+        } else {
+          next = `${next.trimEnd()} nodesep=${nextNodesep}`;
+        }
+        return `\tgraph [${next}]`;
+      });
+    }
+
+    function formatSpacing(n, decimals = 1) {
+      return Number(n.toFixed(decimals)).toString();
+    }
+
+    function updateSpacingLabels() {
+      const horizontal = rankdir === "LR" || rankdir === "RL";
+      ranksepLabel.textContent = horizontal
+        ? "Horizontal spacing (ranksep)"
+        : "Vertical spacing (ranksep)";
+      nodesepLabel.textContent = horizontal
+        ? "Vertical spacing (nodesep)"
+        : "Horizontal spacing (nodesep)";
+    }
+
+    function syncSpacingControls() {
+      ranksepSlider.max = String(Math.max(12, Math.ceil(ranksep * 2)));
+      nodesepSlider.max = String(Math.max(3, Math.ceil(nodesep * 4 * 10) / 10));
+      ranksepSlider.value = String(ranksep);
+      nodesepSlider.value = String(nodesep);
+      ranksepVal.textContent = formatSpacing(ranksep);
+      nodesepVal.textContent = formatSpacing(nodesep, 2);
+      updateSpacingLabels();
+      spacingControls.hidden = false;
+      exportControls.hidden = false;
+      accessoriesToggleWrap.hidden = false;
+      showAccessoriesInSidebar = false;
+      showAccessoriesSidebar.checked = false;
+    }
+
+    function exportBaseName() {
+      return (loadedName || "diagram").replace(/\.(gv|dot|txt)$/i, "");
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function getCurrentDot() {
+      if (!parsed) return null;
+      const hidden = computeHidden();
+      const shownNodes = parsed.nodes.filter((n) => !hidden.has(n.id)).length;
+      if (shownNodes === 0) return null;
+      return buildDot(hidden);
+    }
+
+    async function exportDiagram(format) {
+      const dot = getCurrentDot();
+      if (!dot) {
+        statusEl.textContent = "Nothing to export — enable at least one connector.";
+        return;
+      }
+
+      const base = exportBaseName();
+      const ext = format === "svg" ? "svg" : "png";
+      exportSvgBtn.disabled = true;
+      exportPngBtn.disabled = true;
+      statusEl.innerHTML = `<span class="status">Exporting ${ext.toUpperCase()}…</span>`;
+
+      try {
+        if (format === "svg") {
+          let svg = await renderDotString(dot, "svg");
+          svg = embedImagesForExport(svg);
+          downloadBlob(
+            new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
+            `${base}.svg`
+          );
+        } else {
+          const bytes = await renderDotString(dot, "png");
+          downloadBlob(new Blob([bytes], { type: "image/png" }), `${base}.png`);
+        }
+        statusEl.textContent = `Exported ${base}.${ext}`;
+      } catch (err) {
+        statusEl.innerHTML = `<span class="error">Export failed: ${escapeHtml(err.message)}</span>`;
+      } finally {
+        exportSvgBtn.disabled = false;
+        exportPngBtn.disabled = false;
+      }
+    }
+
+    function scheduleSpacingRerender() {
+      clearTimeout(spacingTimer);
+      spacingTimer = setTimeout(() => rerender({ preserveView: true }), 120);
+    }
+
+    /** WireViz nodes use HTML labels; graph/node/edge lines are attribute defaults only. */
+    function parseNodes(src) {
+      const nodes = [];
+      const seen = new Set();
+      const re = /^\t("(?:[^"\\]|\\.)*"|[A-Za-z_][\w-]*)\s+\[label=/gm;
+      let match;
+      while ((match = re.exec(src)) !== null) {
+        const id = normalizeId(match[1]);
+        if (seen.has(id)) continue;
+        const start = match.index;
+        const rest = src.slice(start);
+        const endMatch = rest.match(/^> fillcolor=[^\]]+\]/m);
+        if (!endMatch) continue;
+        const end = start + endMatch.index + endMatch[0].length;
+        const text = src.slice(start, end);
+        nodes.push({ id, text, label: extractDisplayName(text) || id });
+        seen.add(id);
+      }
+      return nodes;
+    }
+
+    function isCableLabel(text) {
+      return /port="w\d+"/i.test(text) && !/port="p/i.test(text);
+    }
+
+    function parseEndpoint(part) {
+      return normalizeId(part.trim());
+    }
+
+    function parseEdges(src) {
+      const edges = [];
+      const lines = src.split(/\r?\n/);
+      let pendingAttrs = null;
+      for (const line of lines) {
+        const attrM = line.match(/^\tedge \[([^\]]*)\]/);
+        if (attrM) {
+          pendingAttrs = attrM[1];
+          continue;
+        }
+        const edgeM = line.match(/^\t(.+?)\s+--\s+(.+)$/);
+        if (edgeM) {
+          edges.push({
+            from: parseEndpoint(edgeM[1]),
+            to: parseEndpoint(edgeM[2]),
+            fromRaw: edgeM[1].trim(),
+            toRaw: edgeM[2].trim(),
+            attrs: pendingAttrs,
+            line,
+          });
+          pendingAttrs = null;
+        }
+      }
+      return edges;
+    }
+
+    function parseDot(src) {
+      return {
+        header: getHeader(src),
+        nodes: parseNodes(src),
+        edges: parseEdges(src),
+      };
+    }
+
+    function analyzeGraph(data) {
+      const hasPinPort = new Set();
+      const hasWirePort = new Set();
+      const degree = new Map();
+      const nodeIds = new Set(data.nodes.map((n) => n.id));
+      const nodeById = new Map(data.nodes.map((n) => [n.id, n]));
+
+      for (const id of nodeIds) degree.set(id, 0);
+
+      for (const edge of data.edges) {
+        for (const [raw, otherId] of [
+          [edge.fromRaw, edge.to],
+          [edge.toRaw, edge.from],
+        ]) {
+          const id = normalizeId(raw);
+          if (!nodeIds.has(id)) continue;
+          if (/:\s*p\d+/i.test(raw) || /:p\d+/i.test(raw)) hasPinPort.add(id);
+          if (/:\s*w\d+/i.test(raw) || /:w\d+/i.test(raw)) hasWirePort.add(id);
+          degree.set(id, (degree.get(id) || 0) + 1);
+          degree.set(otherId, (degree.get(otherId) || 0) + 1);
+        }
+      }
+
+      function nodeKind(id) {
+        if (isAutogenerated(id)) return "accessory";
+        const node = nodeById.get(id);
+        if (
+          (hasWirePort.has(id) && !hasPinPort.has(id)) ||
+          (node && isCableLabel(node.text))
+        ) {
+          return "cable";
+        }
+        return "connector";
+      }
+
+      const connectors = data.nodes.filter((n) => nodeKind(n.id) === "connector");
+      const junctions = new Set();
+
+      if (connectors.length) {
+        const sorted = [...connectors].sort(
+          (a, b) => (degree.get(b.id) || 0) - (degree.get(a.id) || 0)
+        );
+        const maxDeg = degree.get(sorted[0].id) || 0;
+        const threshold = Math.max(4, Math.ceil(maxDeg * 0.5));
+        for (const { id } of connectors) {
+          if ((degree.get(id) || 0) >= threshold) junctions.add(id);
+        }
+        if (!junctions.size) junctions.add(sorted[0].id);
+      }
+
+      return { hasPinPort, hasWirePort, degree, nodeKind, junctions };
+    }
+
+    function expandBranchFrom(originId, edges) {
+      const branch = new Set([originId]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const { from, to } of edges) {
+          for (const [a, b] of [
+            [from, to],
+            [to, from],
+          ]) {
+            if (!branch.has(a) || branch.has(b)) continue;
+            if (analysis.nodeKind(b) === "connector" && b !== originId) continue;
+            branch.add(b);
+            changed = true;
+          }
+        }
+      }
+      return branch;
+    }
+
+    function visibleEdges() {
+      const hidden = computeHidden();
+      return parsed.edges.filter((e) => !hidden.has(e.from) && !hidden.has(e.to));
+    }
+
+    function buildSvgNodeMap() {
+      svgNodeById = new Map();
+      const svg = canvas.querySelector("svg");
+      if (!svg) return;
+      for (const g of svg.querySelectorAll("g.node")) {
+        const title = g.querySelector(":scope > title");
+        if (title?.textContent) svgNodeById.set(title.textContent, g);
+      }
+    }
+
+    function parseEdgeTitle(title) {
+      const idx = title.indexOf("--");
+      if (idx === -1) return null;
+      return {
+        from: normalizeId(title.slice(0, idx)),
+        to: normalizeId(title.slice(idx + 2)),
+      };
+    }
+
+    function isDashedEdge(g) {
+      return g.querySelector("path[stroke-dasharray]") !== null;
+    }
+
+    function highlightEdgesForBranch(svg, branch) {
+      for (const g of svg.querySelectorAll("g.edge")) {
+        const title = g.querySelector(":scope > title")?.textContent;
+        if (!title) continue;
+        const endpoints = parseEdgeTitle(title);
+        if (!endpoints) continue;
+        const fromIn = branch.has(endpoints.from);
+        const toIn = branch.has(endpoints.to);
+        const dashed = isDashedEdge(g);
+        const terminal =
+          (fromIn &&
+            !toIn &&
+            analysis.nodeKind(endpoints.to) === "connector") ||
+          (toIn &&
+            !fromIn &&
+            analysis.nodeKind(endpoints.from) === "connector");
+        if ((fromIn && toIn) || (dashed && (fromIn || toIn)) || terminal) {
+          g.classList.add("highlight");
+        }
+      }
+    }
+
+    function clearHighlight() {
+      activeHighlightId = null;
+      nodeList.querySelectorAll(".node-item.hover-origin").forEach((el) => {
+        el.classList.remove("hover-origin");
+      });
+      const svg = canvas.querySelector("svg");
+      if (!svg) return;
+      svg.classList.remove("is-highlighting");
+      svg.querySelectorAll(".highlight").forEach((el) => el.classList.remove("highlight"));
+    }
+
+    function applyHighlight(originId) {
+      if (!parsed || canvas.hidden || activeHighlightId === originId) return;
+      clearHighlight();
+      activeHighlightId = originId;
+
+      const svg = canvas.querySelector("svg");
+      if (!svg) return;
+
+      const branch = expandBranchFrom(originId, visibleEdges());
+      svg.classList.add("is-highlighting");
+      for (const id of branch) {
+        const g = svgNodeById.get(id);
+        if (g) g.classList.add("highlight");
+      }
+      highlightEdgesForBranch(svg, branch);
+
+      const row = nodeList.querySelector(`.node-item[data-id="${CSS.escape(originId)}"]`);
+      if (row) row.classList.add("hover-origin");
+    }
+
+    function expandHiddenFrom(seeds, edges) {
+      const hidden = new Set(seeds);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const { from, to } of edges) {
+          for (const [a, b] of [
+            [from, to],
+            [to, from],
+          ]) {
+            if (!hidden.has(a) || hidden.has(b)) continue;
+            if (analysis.nodeKind(b) === "connector" && visible.get(b) !== false) {
+              continue;
+            }
+            hidden.add(b);
+            changed = true;
+          }
+        }
+      }
+      return hidden;
+    }
+
+    function computeHidden() {
+      const seeds = [];
+      for (const [id, isVisible] of visible) {
+        if (!isVisible) seeds.push(id);
+      }
+      return expandHiddenFrom(seeds, parsed.edges);
+    }
+
+    function buildDot(hidden) {
+      const parts = [applyGraphSpacing(parsed.header, ranksep, nodesep)];
+      for (const node of parsed.nodes) {
+        if (!hidden.has(node.id)) parts.push(node.text);
+      }
+      for (const edge of parsed.edges) {
+        if (!hidden.has(edge.from) && !hidden.has(edge.to)) {
+          if (edge.attrs) parts.push(`\tedge [${edge.attrs}]`);
+          parts.push(edge.line);
+        }
+      }
+      if (!parts[parts.length - 1].trim().endsWith("}")) parts.push("}");
+      return parts.join("\n");
+    }
+
+    function sidebarNodes() {
+      const items = [];
+      for (const n of parsed.nodes) {
+        const nodeKindVal = analysis.nodeKind(n.id);
+        if (nodeKindVal === "connector") {
+          items.push({
+            id: n.id,
+            label: n.label,
+            kind: analysis.junctions.has(n.id) ? "junction" : "connector",
+          });
+        } else if (nodeKindVal === "accessory" && showAccessoriesInSidebar) {
+          items.push({ id: n.id, label: n.label, kind: "accessory" });
+        }
+      }
+      return items.sort((a, b) => {
+        const order = { junction: 0, connector: 1, accessory: 2 };
+        const d = order[a.kind] - order[b.kind];
+        return d !== 0 ? d : a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
+      });
+    }
+
+    function groupTitle(kind) {
+      if (kind === "junction") return "Junction connectors";
+      if (kind === "accessory") return "Accessories";
+      return "Connectors";
+    }
+
+    function renderSidebar() {
+      const items = sidebarNodes();
+      if (!items.length) {
+        nodeList.innerHTML =
+          '<div class="empty" style="height:auto;padding:24px 16px;">No connector nodes found.' +
+          (showAccessoriesInSidebar
+            ? ""
+            : ' Enable “Show accessories in sidebar” to list ferrules and splices.') +
+          "</div>";
+        return;
+      }
+      let html = "";
+      let lastGroup = "";
+      for (const { id, label, kind } of items) {
+        const group = groupTitle(kind);
+        if (group !== lastGroup) {
+          html += `<div class="group-title">${group}</div>`;
+          lastGroup = group;
+        }
+        const checked = visible.get(id) !== false;
+        const sub = label !== id ? `<span class="sub">${escapeHtml(id)}</span>` : "";
+        html += `<label class="node-item" data-id="${escapeAttr(id)}"><input type="checkbox" data-id="${escapeAttr(id)}" ${checked ? "checked" : ""} /><span class="label">${escapeHtml(label)}${sub}</span><span class="tag">${kind}</span></label>`;
+      }
+      nodeList.innerHTML = html;
+      nodeList.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+        cb.addEventListener("change", () => {
+          visible.set(cb.dataset.id, cb.checked);
+          rerender();
+        });
+      });
+      nodeList.querySelectorAll(".node-item[data-id]").forEach((item) => {
+        item.addEventListener("mouseenter", () => applyHighlight(item.dataset.id));
+      });
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/"/g, "&quot;");
+    }
+
+    function setPlaceholder(show, text) {
+      viewport.classList.toggle("show-placeholder", show);
+      if (text !== undefined) placeholder.textContent = text;
+    }
+
+    async function rerender({ preserveView = false } = {}) {
+      if (!parsed) return;
+      const hidden = computeHidden();
+      const dot = buildDot(hidden);
+      const shownNodes = parsed.nodes.filter((n) => !hidden.has(n.id)).length;
+      const shownEdges = parsed.edges.filter(
+        (e) => !hidden.has(e.from) && !hidden.has(e.to)
+      ).length;
+      countsEl.textContent = `${shownNodes} nodes · ${shownEdges} edges`;
+
+      if (shownNodes === 0) {
+        canvas.hidden = true;
+        setPlaceholder(true, "All components hidden — enable at least one connector.");
+        return;
+      }
+
+      const prevScale = scale;
+      const prevPanX = panX;
+      const prevPanY = panY;
+
+      try {
+        statusEl.innerHTML = '<span class="status">Rendering…</span>';
+        setPlaceholder(false);
+        clearHighlight();
+        const svg = await renderDotString(dot, "svg");
+        canvas.innerHTML = svg;
+        canvas.hidden = false;
+        prepareSvgForPanZoom(canvas.querySelector("svg"));
+        buildSvgNodeMap();
+        const imgNote =
+          embeddedImageSrcs.length && srcToMountPath.size < embeddedImageSrcs.length
+            ? ` · ${srcToMountPath.size}/${embeddedImageSrcs.length} images loaded`
+            : "";
+        statusEl.textContent =
+          "Drag to pan · scroll to zoom · hover sidebar to highlight branch" + imgNote;
+        if (preserveView && prevScale > 0) {
+          scale = prevScale;
+          panX = prevPanX;
+          panY = prevPanY;
+          applyTransform();
+        } else {
+          scheduleFitView();
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span class="error">Render error: ${escapeHtml(err.message)}</span>`;
+      }
+    }
+
+    async function loadDot(text, name) {
+      clearImageAssets();
+      rawDot = text;
+      loadedName = name || "diagram.gv";
+      embeddedImageSrcs = collectEmbeddedImageSrcs(rawDot);
+      parsed = parseDot(rawDot);
+      originalNodeText = new Map(parsed.nodes.map((n) => [n.id, n.text]));
+      analysis = analyzeGraph(parsed);
+      ({ ranksep, nodesep, rankdir } = parseGraphSpacing(parsed.header));
+      syncSpacingControls();
+      visible = new Map();
+      for (const { id } of sidebarNodes()) visible.set(id, true);
+      renderSidebar();
+
+      if (embeddedImageSrcs.length) {
+        statusEl.textContent = `Loaded ${name} (${parsed.nodes.length} nodes, ${parsed.edges.length} edges) · 0/${embeddedImageSrcs.length} images`;
+        syncImageFolderUi();
+        showImagePrompt();
+      } else {
+        syncImageFolderUi();
+        statusEl.textContent = `Loaded ${name} (${parsed.nodes.length} nodes, ${parsed.edges.length} edges)`;
+      }
+      await rerender();
+    }
+
+    function isDotSourceFile(file) {
+      if (!file?.name) return false;
+      if (/\.(gv|dot|txt)$/i.test(file.name)) return true;
+      return !/\.[^./\\]+$/.test(file.name);
+    }
+
+    async function loadFile(file) {
+      if (!file) return;
+      const text = await file.text();
+      if (!/^\s*graph\s*\{/m.test(text)) {
+        statusEl.innerHTML = `<span class="error">Not a WireViz Graphviz file (expected to start with <code>graph {</code>).</span>`;
+        return;
+      }
+      await loadDot(text, file.name);
+    }
+
+    fileInput.addEventListener("change", (e) => loadFile(e.target.files?.[0]));
+
+    imageFolderBtn.addEventListener("click", () => onImageFolderChosen());
+    imagePromptChoose.addEventListener("click", () => onImageFolderChosen());
+    imagePromptSkip.addEventListener("click", () => hideImagePrompt());
+
+    viewport.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      viewport.classList.add("dragover");
+    });
+    viewport.addEventListener("dragleave", () => viewport.classList.remove("dragover"));
+    viewport.addEventListener("drop", (e) => {
+      e.preventDefault();
+      viewport.classList.remove("dragover");
+      const file = [...e.dataTransfer.files].find(isDotSourceFile);
+      if (file) loadFile(file);
+    });
+
+    document.getElementById("showAll").addEventListener("click", () => {
+      for (const key of visible.keys()) visible.set(key, true);
+      renderSidebar();
+      rerender();
+    });
+
+    document.getElementById("hideLeaves").addEventListener("click", () => {
+      for (const [id] of visible) {
+        visible.set(id, analysis.junctions.has(id));
+      }
+      renderSidebar();
+      rerender();
+    });
+
+    showAccessoriesSidebar.addEventListener("change", () => {
+      showAccessoriesInSidebar = showAccessoriesSidebar.checked;
+      if (showAccessoriesInSidebar) {
+        for (const n of parsed.nodes) {
+          if (analysis.nodeKind(n.id) === "accessory" && !visible.has(n.id)) {
+            visible.set(n.id, true);
+          }
+        }
+      } else {
+        for (const n of parsed.nodes) {
+          if (analysis.nodeKind(n.id) === "accessory") visible.delete(n.id);
+        }
+      }
+      renderSidebar();
+      rerender();
+    });
+
+    nodeList.addEventListener("mouseleave", clearHighlight);
+
+    function applyTransform() {
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    }
+
+    /** Graphviz uses width/height in pt — normalize so 1 viewBox unit = 1 CSS px for pan/zoom math. */
+    function prepareSvgForPanZoom(svg) {
+      const vb = svg.viewBox?.baseVal;
+      if (!vb?.width || !vb?.height) return;
+      svg.removeAttribute("width");
+      svg.removeAttribute("height");
+      svg.style.width = `${vb.width}px`;
+      svg.style.height = `${vb.height}px`;
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    }
+
+    function padBounds(b, frac = 0.04) {
+      const pad = Math.max(b.width, b.height) * frac;
+      return {
+        x: b.x - pad,
+        y: b.y - pad,
+        width: b.width + pad * 2,
+        height: b.height + pad * 2,
+      };
+    }
+
+    function boundsInSvgRoot(svg, el) {
+      const bb = el.getBBox();
+      if (!bb.width || !bb.height) return null;
+      const m = el.getCTM();
+      if (!m) return bb;
+      const pt = svg.createSVGPoint();
+      const xs = [];
+      const ys = [];
+      for (const [x, y] of [
+        [bb.x, bb.y],
+        [bb.x + bb.width, bb.y],
+        [bb.x, bb.y + bb.height],
+        [bb.x + bb.width, bb.y + bb.height],
+      ]) {
+        pt.x = x;
+        pt.y = y;
+        const p = pt.matrixTransform(m);
+        xs.push(p.x);
+        ys.push(p.y);
+      }
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      return {
+        x: minX,
+        y: minY,
+        width: Math.max(...xs) - minX,
+        height: Math.max(...ys) - minY,
+      };
+    }
+
+    function getDiagramBounds(svg) {
+      const vb = svg.viewBox?.baseVal;
+      const fallback = vb?.width
+        ? { x: vb.x, y: vb.y, width: vb.width, height: vb.height }
+        : null;
+
+      const graph = svg.querySelector("g.graph, #graph0");
+      if (graph) {
+        const b = boundsInSvgRoot(svg, graph);
+        if (b?.width > 1 && b.height > 1) return padBounds(b);
+      }
+
+      try {
+        const b = svg.getBBox();
+        if (b.width > 1 && b.height > 1) return padBounds(b);
+      } catch (_) {
+        /* ignore */
+      }
+
+      return fallback ? padBounds(fallback) : null;
+    }
+
+    function fitView() {
+      const svg = canvas.querySelector("svg");
+      if (!svg) return;
+      prepareSvgForPanZoom(svg);
+      const bounds = getDiagramBounds(svg);
+      const vw = viewport.clientWidth;
+      const vh = viewport.clientHeight;
+      if (!bounds?.width || !bounds?.height || !vw || !vh) return;
+
+      const margin = 0.94;
+      scale = Math.min(vw / bounds.width, vh / bounds.height) * margin;
+      panX = (vw - bounds.width * scale) / 2 - bounds.x * scale;
+      panY = (vh - bounds.height * scale) / 2 - bounds.y * scale;
+      applyTransform();
+    }
+
+    let fitViewFrame = null;
+    function scheduleFitView() {
+      cancelAnimationFrame(fitViewFrame);
+      fitViewFrame = requestAnimationFrame(() => {
+        fitViewFrame = requestAnimationFrame(fitView);
+      });
+    }
+
+    document.getElementById("fitView").addEventListener("click", scheduleFitView);
+
+    exportSvgBtn.addEventListener("click", () => exportDiagram("svg"));
+    exportPngBtn.addEventListener("click", () => exportDiagram("png"));
+
+    ranksepSlider.addEventListener("input", () => {
+      ranksep = parseFloat(ranksepSlider.value);
+      ranksepVal.textContent = formatSpacing(ranksep);
+      scheduleSpacingRerender();
+    });
+    nodesepSlider.addEventListener("input", () => {
+      nodesep = parseFloat(nodesepSlider.value);
+      nodesepVal.textContent = formatSpacing(nodesep, 2);
+      scheduleSpacingRerender();
+    });
+
+    let dragging = false;
+    let dragStart = { x: 0, y: 0, panX: 0, panY: 0 };
+
+    viewport.addEventListener("mousedown", (e) => {
+      if (canvas.hidden) return;
+      dragging = true;
+      viewport.classList.add("dragging");
+      dragStart = { x: e.clientX, y: e.clientY, panX, panY };
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      panX = dragStart.panX + (e.clientX - dragStart.x);
+      panY = dragStart.panY + (e.clientY - dragStart.y);
+      applyTransform();
+    });
+    window.addEventListener("mouseup", () => {
+      dragging = false;
+      viewport.classList.remove("dragging");
+    });
+    viewport.addEventListener(
+      "wheel",
+      (e) => {
+        if (canvas.hidden) return;
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const rect = viewport.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        panX = mx - (mx - panX) * factor;
+        panY = my - (my - panY) * factor;
+        scale *= factor;
+        applyTransform();
+      },
+      { passive: false }
+    );
+
+    window.addEventListener("resize", () => {
+      if (!canvas.hidden) scheduleFitView();
+    });
+  </script>
+</body>
+</html>
