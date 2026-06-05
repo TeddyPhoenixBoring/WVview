@@ -1,0 +1,338 @@
+# Example harness — standalone WireViz demo (topology based on Pendant.yaml).
+# Generic connector/device names and wire numbers only; no vendor part numbers.
+# Generate: wireviz Example.yaml -fghpst
+
+templates:
+  - &Transducer4to20
+    type: Pressure transducer
+    subtype: 4–20 mA
+    pinlabels: [NC, NC, NC, SIG+, SIG-]
+  - &LimitSwitchSPDT
+    type: Limit switch
+    subtype: SPDT
+    pinlabels: [NO, NC, COM]
+  - &RelayNO
+    type: Relay contact
+    subtype: NO
+    pinlabels: [NO1, NO2]
+  - &Pot10k
+    type: Potentiometer
+    subtype: 10 kΩ linear
+    pinlabels: [CW, WIPER, CCW]
+  - &JoystickPot
+    type: Joystick potentiometer
+    subtype: 10 kΩ center tap
+    pincount: 4
+    loops:
+      - [1, 3]
+
+connectors:
+  J1:
+    type: Circular connector
+    subtype: male 24-pin
+    pincount: 24
+  J2:
+    type: Circular connector
+    subtype: female 24-pin
+    pincount: 24
+  J3:
+    type: Circular connector
+    subtype: male 24-pin
+    pincount: 24
+  S1:
+    type: Emergency stop
+    pinlabels: [PWR, RET]
+  S2:
+    type: Pushbutton station
+    subtype: illuminated latching 24 V
+    pinlabels: [NC1, NC2, NO3, NO4, L+, L-]
+  F:
+    style: simple
+    type: Ferrule
+    color: GY
+  RT:
+    style: simple
+    type: Ring terminal
+    color: RD
+  T1:
+    <<: *Transducer4to20
+  T2:
+    <<: *Transducer4to20
+  S3:
+    <<: *LimitSwitchSPDT
+  S4:
+    <<: *LimitSwitchSPDT
+  S5:
+    <<: *LimitSwitchSPDT
+  S6:
+    <<: *LimitSwitchSPDT
+  R1:
+    <<: *RelayNO
+  R2:
+    <<: *RelayNO
+  P1:
+    <<: *Pot10k
+  P2:
+    <<: *Pot10k
+  P3:
+    <<: *JoystickPot
+  P4:
+    <<: *JoystickPot
+
+cables:
+  C1:
+    gauge: 0.75 mm2
+    show_equiv: true
+    length: 18.3
+    color_code: DIN
+    wirecount: 25
+    shield: false
+    notes: Backbone harness — wires 1–24 + spare
+  C2:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 201–202
+  C3:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 4
+    notes: Wires 301–304
+  C4:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 401–402
+  C5:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 501–502
+  C6:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 601–602
+  C7:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 701–702
+  C8:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 801–802
+  C9:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 901–902
+  C10:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 1001–1002
+  C11:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 1101–1102
+  C12:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 1201–1202
+  C13:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 1301–1302
+  C14:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 1401–1402
+  C15:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 2
+    notes: Wires 1501–1502
+  C16:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 1
+    notes: Wire 1601
+  C17:
+    gauge: 0.75 mm2
+    show_equiv: true
+    color_code: DIN
+    wirecount: 1
+    notes: Wire 1701
+
+connections:
+  # Backbone J1 → C1 → J2 → J3
+  - - J1: [1-24]
+    - <--
+    - F.
+    - C1: [1-24]
+    - F.
+    - -->
+    - J2: [1-24]
+    - ==>
+    - J3: [1-24]
+
+  # Emergency stop
+  - - J3: [1, 2]
+    - <--
+    - F.
+    - C2: [1, 2]
+    - F.
+    - -->
+    - S1: [1, 2]
+
+  # Aux pushbuttons
+  - - J3: [10, 15, 15, 22]
+    - <--
+    - F.
+    - C3: [1-4]
+    - F.
+    - -->
+    - S2: [3, 4, 5, 6]
+
+  # Motor pressure transducer
+  - - J3: [17, 18]
+    - <--
+    - F.
+    - C4: [1-2]
+    - RT.
+    - -->
+    - T1: [4-5]
+
+  # Cylinder pressure transducer
+  - - J3: [19, 20]
+    - <--
+    - F.
+    - C5: [1-2]
+    - RT.
+    - -->
+    - T2: [4-5]
+
+  # Forward limit switch
+  - - J3: [3, 15]
+    - <--
+    - F.
+    - C6: [1-2]
+    - S3: [2, 3]
+
+  # Backward limit switch
+  - - J3: [4, 15]
+    - <--
+    - F.
+    - C7: [1-2]
+    - S4: [2, 3]
+
+  # CCW motor switch
+  - - J3: [5, 15]
+    - <--
+    - F.
+    - C8: [1-2]
+    - S5: [2, 3]
+
+  # CW motor switch
+  - - J3: [6, 15]
+    - <--
+    - F.
+    - C9: [1-2]
+    - S6: [2, 3]
+
+  # Lock relay contacts
+  - - J3: [7, 15]
+    - <--
+    - F.
+    - C10: [1-2]
+    - F.
+    - -->
+    - R1: [1, 2]
+
+  # Unlock relay contacts
+  - - J3: [8, 15]
+    - <--
+    - F.
+    - C11: [1-2]
+    - F.
+    - -->
+    - R2: [1, 2]
+
+  # Motor potentiometer
+  - - J3: [11, 12]
+    - <--
+    - F.
+    - C12: [1-2]
+    - P1: [3, 1]
+
+  # Cylinder potentiometer
+  - - J3: [11, 12]
+    - <--
+    - F.
+    - C13: [1-2]
+    - P2: [3, 1]
+
+  # Motor joystick wiper
+  - - J3: [12]
+    - <--
+    - F.
+    - C14: [2]
+    - P3: [4]
+
+  # Cylinder joystick wiper
+  - - J3: [12]
+    - <--
+    - F.
+    - C15: [2]
+    - P4: [4]
+
+  # Motor pot ↔ motor joystick
+  - - P1: [2]
+    - C14: [1]
+    - P3: [1]
+
+  # Cylinder pot ↔ cylinder joystick
+  - - P2: [2]
+    - C15: [1]
+    - P4: [1]
+
+  # Motor joystick center tap
+  - - J3: [13]
+    - <--
+    - F.
+    - C16: [1]
+    - P3: [2]
+
+  # Cylinder joystick center tap
+  - - J3: [14]
+    - <--
+    - F.
+    - C17: [1]
+    - P4: [2]
+
+tweak:
+  override:
+    graph:
+      ranksep: "4"
+      nodesep: "1.0"
